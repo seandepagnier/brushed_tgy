@@ -32,6 +32,8 @@
 
 .equ	BpFET_port	= PORTB
 .equ	CpFET_port	= PORTB
+.equ    RCP_IN_port     = PINB
+
 
 ;*********************
 ; PORT C definitions *

@@ -161,7 +161,7 @@ boot_loader_test1:
         rjmp boot_loader_jump
 	ldz 62100
 	rcall delay
-	sbic	PINB, rcp_in		; Skip clear if ICP pin h
+	sbic	RCP_IN_port, rcp_in		; Skip clear if ICP pin h
         rjmp boot_loader_test1
 
         a_bottom_off
@@ -381,9 +381,9 @@ ma6:    ; update throttle
 GetPwm: ;--- get PWM input value ---
 	;wait for low to high transition on ppm input
 
-ge1:	sbic	PINB, rcp_in		; Skip clear if ICP pin h
+ge1:	sbic	RCP_IN_port, rcp_in		; Skip clear if ICP pin h
 	rjmp ge1
-ge2:	sbis	PINB, rcp_in		; Skip clear if ICP pin h
+ge2:	sbis	RCP_IN_port, rcp_in		; Skip clear if ICP pin h
 	rjmp ge2
 
 	;start counting
@@ -394,7 +394,7 @@ ge2:	sbis	PINB, rcp_in		; Skip clear if ICP pin h
 
 	;wait for low edge
 
-ge3:    sbic	PINB, rcp_in		; Skip clear if ICP pin h
+ge3:    sbic	RCP_IN_port, rcp_in		; Skip clear if ICP pin h
 	rjmp ge3
 
 	;get time

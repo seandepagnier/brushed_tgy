@@ -30,6 +30,7 @@
 
 .equ	AnFET_port	= PORTD
 .equ	ApFET_port	= PORTD
+.equ    RCP_IN_port     = PIND
 
 ;*********************
 ; PORT C definitions *
