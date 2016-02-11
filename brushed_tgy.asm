@@ -260,7 +260,8 @@ re5:
         rjmp ar4                ; skip arming
 
 ar2:	ldi Counter, 0
-
+ar12:   wdr
+        rcall strobe_swd 
 ar1:	rcall GetPwm
         
 	ldy ThrottleNeutral - 20
@@ -294,10 +295,13 @@ ar3:	ldx 20
 ar4:    
 	clr zl
 	rcall wms
-       
+
 	;--- Main loop ---
+ma0:    wdr
+        rcall strobe_swd 
+
 ma1:	rcall GetPwm		;get input PWM value
-	
+        
 	subi xl, low(ThrottleNeutral)	;subtract throttle neutral
 	sbci xh, high(ThrottleNeutral)
 
@@ -306,7 +310,7 @@ ma1:	rcall GetPwm		;get input PWM value
 	asr xh			;divide by 2
 	ror xl
 
-;;;  if far out of range, jump to bootloader and require rearm
+;;;  if far out of range, ignore, and don't strobe (treat as no signal)
 	ldy 200			;limit upper value
         cp xl, yl
         cpc xh, yh
@@ -315,7 +319,7 @@ ma1:	rcall GetPwm		;get input PWM value
         cp xl, yl
         cpc xh, yh
         brge in_range
-        rjmp boot_loader_jump
+        rjmp ma1
 in_range:       
         b_bottom_on ;;  turn bottom b on, allowing channel to be used for clutch
         
@@ -351,12 +355,12 @@ ma3:
 	rcall wms
 	rcall wms
         
-	rjmp ma1
+	rjmp ma0
 ma4:
         ; Set Throttle
         mov t, xl
         sub t, Throttle
-        breq ma1                ; already set
+        breq ma0                ; already set
         brlt ma5
         ; command greater than throttle
         cpi t, MaxSlewRate
@@ -369,14 +373,12 @@ ma5:    ; command is less than throttle
         ldi t, -MaxSlewRate        ; exceeded slew rate
 ma6:    ; update throttle
         add Throttle, t
-	rjmp ma1
+	rjmp ma0
 
 
 	;--- SUBS ---
 	
 GetPwm: ;--- get PWM input value ---
-        wdr
-        rcall strobe_swd 
 	;wait for low to high transition on ppm input
 
 ge1:	sbic	PINB, rcp_in		; Skip clear if ICP pin h
