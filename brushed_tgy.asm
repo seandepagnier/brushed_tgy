@@ -23,8 +23,9 @@
 ;**** SETTINGS ****
 
 .equ	BrakeStrength = 0	;0 to 127
+.equ   MaxSlewRate = 20        ;1 to 127
 .equ	DeadBand = 16		;n/127 parts
-.equ	ThrottleNeutral = 1460	;uS
+.equ	ThrottleNeutral = 1500	;uS
 
 ;******************
 .def	t=r16
@@ -341,7 +342,22 @@ ma3:
 	rcall sound
 	rjmp ma1
 ma4:
-        mov Throttle, xl	;set throttle
+        ; Set Throttle
+        mov t, xl
+        sub t, Throttle
+        breq ma1                ; already set
+        brlt ma5
+        ; command greater than throttle
+        cpi t, MaxSlewRate
+        brlo ma6
+        ldi t, MaxSlewRate         ; exceeded slew rate
+        rjmp ma6
+ma5:    ; command is less than throttle
+        cpi t, -MaxSlewRate
+        brsh ma6
+        ldi t, -MaxSlewRate        ; exceeded slew rate
+ma6:    ; update throttle
+        add Throttle, t
 	rjmp ma1
 
 
