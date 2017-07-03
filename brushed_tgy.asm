@@ -260,8 +260,7 @@ re5:
         rjmp ar4                ; skip arming
 
 ar2:	ldi Counter, 0
-ar12:   wdr
-        rcall strobe_swd 
+
 ar1:	rcall GetPwm
         
 	ldy ThrottleNeutral - 20
@@ -292,16 +291,13 @@ ar3:	ldx 20
 	dec Counter
 	brne ar3
 
-ar4:    
 	clr zl
 	rcall wms
-
+ar4:    
+       
 	;--- Main loop ---
-ma0:    wdr
-        rcall strobe_swd 
-
 ma1:	rcall GetPwm		;get input PWM value
-        
+	
 	subi xl, low(ThrottleNeutral)	;subtract throttle neutral
 	sbci xh, high(ThrottleNeutral)
 
@@ -310,7 +306,7 @@ ma1:	rcall GetPwm		;get input PWM value
 	asr xh			;divide by 2
 	ror xl
 
-;;;  if far out of range, ignore, and don't strobe (treat as no signal)
+;;;  if far out of range, reset
 	ldy 200			;limit upper value
         cp xl, yl
         cpc xh, yh
@@ -319,7 +315,7 @@ ma1:	rcall GetPwm		;get input PWM value
         cp xl, yl
         cpc xh, yh
         brge in_range
-        rjmp ma1
+        rjmp reset
 in_range:       
         b_bottom_on ;;  turn bottom b on, allowing channel to be used for clutch
         
@@ -355,12 +351,12 @@ ma3:
 	rcall wms
 	rcall wms
         
-	rjmp ma0
+	rjmp ma1
 ma4:
         ; Set Throttle
         mov t, xl
         sub t, Throttle
-        breq ma0                ; already set
+        breq ma1                ; already set
         brlt ma5
         ; command greater than throttle
         cpi t, MaxSlewRate
@@ -373,12 +369,14 @@ ma5:    ; command is less than throttle
         ldi t, -MaxSlewRate        ; exceeded slew rate
 ma6:    ; update throttle
         add Throttle, t
-	rjmp ma0
+	rjmp ma1
 
 
 	;--- SUBS ---
 	
 GetPwm: ;--- get PWM input value ---
+        wdr
+        rcall strobe_swd 
 	;wait for low to high transition on ppm input
 
 ge1:	sbic	RCP_IN_port, rcp_in		; Skip clear if ICP pin h
@@ -509,8 +507,11 @@ tm2:
 
 timer2overflow:
         subi softwd, 1
-        breq boot_loader_jump   
+                                ;breq boot_loader_jump
+        breq reset_ov
         reti
+reset_ov:
+        rjmp reset
 
 	;--- Sound generation ---
 
@@ -608,6 +609,6 @@ boot_loader_jump:
 	out	DDRC, t
 	out	DDRD, t
 
- 	outi	WDTCR, (1<<WDCE)+(1<<WDE), temp1
- 	out	WDTCR, ZH		; Disable watchdog
+ 	outi	WDTCR, (1<<WDCE)+(1<<WDE)
+ 	out	WDTCR, Counter		; Disable watchdog
 	rjmp	BOOT_START		; Jump to boot loader
