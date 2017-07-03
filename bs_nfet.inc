@@ -42,6 +42,8 @@
 .equ	CpFET		= 3
 .equ	mux_voltage	= 2	; ADC2 voltage input (220k from Vbat, 51k to gnd, 10.10V -> 1.900V at ADC2)
 .equ	mux_temperature	= 1	; ADC1 temperature input (some boards) (10k NTC to 5V, 820 to gnd)
+.equ    temperature_pos = 1 ; adc increases with temp
+.equ    temperature_hot = 331 ; = 820./(820+1713)*1024.0 ;  1713 = (65C)
 .equ	mux_c		= 0	; ADC0
 
 .equ	O_POWER		= 220

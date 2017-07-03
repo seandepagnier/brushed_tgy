@@ -140,6 +140,10 @@ unused:	reti
 reset:	in resetflags, mcucsr
 	outi mcucsr, 0
 
+        ldi Counter, 0
+ 	outi	WDTCR, (1<<WDCE)+(1<<WDE)
+ 	out	WDTCR, Counter		; Disable watchdog
+        
 	outi spl, low(ramend)
 	outi sph, high(ramend)
 
@@ -152,6 +156,7 @@ reset:	in resetflags, mcucsr
 	outi DDRC, DIR_PC
 	outi DDRD, DIR_PD
 
+        rcall strobe_swd 
         ;;  --- bootloader test ---
         ;; half a second to enter bootloader if pwm pin is held high
         clr t
@@ -181,7 +186,7 @@ boot_loader_test1:
 	outi tccr0, (1<<CS00)   ; no prescale
 	;outi timsk, (1<<TOIE0)  ; interrupt on overflow
 
-        clr softwd
+        rcall strobe_swd 
         
         outi tccr2, (1<<CS20) | (1<<CS21) | (1<<CS22) ; overflows 61 times per second
 	outi timsk, (1<<TOIE0) | (1<<TOIE2)  ; interrupt on overflow
@@ -190,15 +195,15 @@ boot_loader_test1:
  	outi admux, (1<<MUX2) | (1<<MUX1) | (1<<REFS0)
  	outi adcsra, (1<<ADEN) | (1<<ADSC) | (1<<ADFR) | (1<<ADPS2) | (1<<ADPS1) | (1<<ADPS0)
 
+
 	;--- Variables setup ---
 	clr Throttle
 
 	;--- Reset cause signalling ---
-	clr zl		;wait
+        sei
 	rcall wms
         GRN_on
         
-
 re1:       
 	sbrs resetflags, 2	;Brown out reset
 	rjmp re2
@@ -245,22 +250,28 @@ re4:
 	sbrs resetflags, 3	;watchdog reset
 	rjmp re5
        
-	ldx 500
+	ldx 100
+	ldy 1200
+	rcall sound
+	ldx 200
 	ldy 1000
+	rcall sound
+	ldx 100
+	ldy 1200
 	rcall sound
 
 re5:	
-	sei
 	;--- arming ---
         RED_on
         GRN_off
-        outi WDTCR, (1<<WDCE)+(1<<WDE)           
-        outi WDTCR, (1<<WDE)+(1<<WDP2)+(1<<WDP1)+(1<<WDP0)
+
+
+        outi WDTCR, (1<<WDCE)+(1<<WDE)
+        outi WDTCR, (1<<WDE)+(1<<WDP2)+(1<<WDP0) ;
 
         rjmp ar4                ; skip arming
 
 ar2:	ldi Counter, 0
-
 ar1:	rcall GetPwm
         
 	ldy ThrottleNeutral - 20
@@ -293,10 +304,10 @@ ar3:	ldx 20
 
 	clr zl
 	rcall wms
-ar4:    
-       
+ar4:
 	;--- Main loop ---
 ma1:	rcall GetPwm		;get input PWM value
+
 	
 	subi xl, low(ThrottleNeutral)	;subtract throttle neutral
 	sbci xh, high(ThrottleNeutral)
@@ -334,10 +345,14 @@ ma3:
 	in yl, adcl		;High temp?
 	in yh, adch
 	
-	ldz 350                 ;  overtemp at 60C
+	ldz temperature_hot                 ;  overtemp at 60C
 	cp yl, zl
 	cpc yh, zh
+        .if     temperature_pos > 0
+        brlo ma4
+        .else
 	brsh ma4
+        .endif
 
 	clr Throttle            ; turn off motor
 
@@ -375,7 +390,6 @@ ma6:    ; update throttle
 	;--- SUBS ---
 	
 GetPwm: ;--- get PWM input value ---
-        wdr
         rcall strobe_swd 
 	;wait for low to high transition on ppm input
 
@@ -507,10 +521,10 @@ tm2:
 
 timer2overflow:
         subi softwd, 1
-                                ;breq boot_loader_jump
         breq reset_ov
         reti
 reset_ov:
+        
         rjmp reset
 
 	;--- Sound generation ---
@@ -526,7 +540,7 @@ sound:	cli
 	rcall delay
 
 so1:
-        wdr
+        
         rcall strobe_swd 
 	a_top_on
 	nop
@@ -570,7 +584,8 @@ so1:
 
         ;; implement software watchdog using timer2
 strobe_swd:
-        ldi softwd, 20         ; timeout 400 milliseconds to receive signal
+        wdr
+        ldi softwd, 20         ; timeout 200 milliseconds to receive signal
         ret
 
 	;--- Delay ---
@@ -595,7 +610,17 @@ wm2:	  dec zh
 
 ;-----bko-----------------------------------------------------------------
 boot_loader_jump:
+	ldx 1000
+	ldy 2500
+	rcall sound
+        
 	cli
+        
+        ldi Counter, 0
+        wdr
+ 	outi	WDTCR, (1<<WDCE)+(1<<WDE)
+ 	out	WDTCR, Counter		; Disable watchdog
+        
 	a_bottom_off
 	b_bottom_off
 	c_bottom_off
@@ -609,6 +634,4 @@ boot_loader_jump:
 	out	DDRC, t
 	out	DDRD, t
 
- 	outi	WDTCR, (1<<WDCE)+(1<<WDE)
- 	out	WDTCR, Counter		; Disable watchdog
 	rjmp	BOOT_START		; Jump to boot loader

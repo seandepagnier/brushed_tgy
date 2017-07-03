@@ -40,6 +40,9 @@
 ;*********************
 .equ	mux_voltage	= 7	; ADC7 voltage input (18k from Vbat, 3.3k to gnd, 10.10V -> 1.565V at ADC7)
 .equ	mux_temperature	= 6	; ADC6 temperature input (3.3k from +5V, 10k NTC to gnd)
+.equ    temperature_pos = 0 ; adc decreases with temp
+.equ    temperature_hot = 350 ; 1713./(3300+1713)*1024.0 ;  1713 = (65C)
+
 .equ	i2c_clk		= 5	; ADC5/SCL
 .equ	i2c_data	= 4	; ADC4/SDA
 .equ	red_led		= 3	; o
