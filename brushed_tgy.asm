@@ -15,15 +15,19 @@
 #include "afro_nfet.inc"	; AfroESC 3 with all nFETs (ICP PWM, I2C, UART)
 #endif
 
-#if !USE_ICP
-#error "currently only icp supported"
+#if defined(bs_nfet_esc)
+#include "bs_nfet.inc"	; AfroESC 3 with all nFETs (ICP PWM, I2C, UART)
 #endif
+
+;#if !USE_ICP                    
+;#error "currently only icp supported"
+;#endif
 
         
 ;**** SETTINGS ****
 
 .equ	BrakeStrength = 0	;0 to 127
-.equ   MaxSlewRate = 16        ;1 to 127
+.equ    MaxSlewRate = 16        ;1 to 127
 .equ	DeadBand = 16		;n/127n parts
 .equ	ThrottleNeutral = 1500	;uS
 
@@ -36,12 +40,10 @@
 .def	sregsave=r21
 .def	resetflags=r22
 .def	Counter=r23
+.def    softwd=r24
 .equ	BOOT_JUMP	= 1	; Jump to any boot loader when PW
 .equ	BOOT_START	= THIRDBOOTSTART
 
-.MACRO GRN_off
-	cbi	DDRC, green_led
-.ENDMACRO
 .macro	a_top_on
 	cbi ApFET_port, ApFET
 .endmacro
@@ -117,7 +119,7 @@
 	rjmp unused
 	rjmp unused
 	rjmp unused
-	rjmp unused
+	rjmp timer2overflow
 	rjmp unused
 	rjmp unused
 	rjmp unused
@@ -164,22 +166,25 @@ boot_loader_test1:
 
         a_bottom_off
         b_bottom_off
+        c_bottom_off
         a_top_off
         b_top_off
-
         c_top_off
-        c_bottom_off
 
         RED_off
         GRN_off
-
 	;--- Timer 1 setup ---
 	outi tccr1a, 0
 	outi tccr1b, (1<<CS11)  ;2 MHz
 
 	;--- ISR setup ---
 	outi tccr0, (1<<CS00)   ; no prescale
-	outi timsk, (1<<TOIE0)  ; interrupt on overflow
+	;outi timsk, (1<<TOIE0)  ; interrupt on overflow
+
+        clr softwd
+        
+        outi tccr2, (1<<CS20) | (1<<CS21) | (1<<CS22) ; overflows 61 times per second
+	outi timsk, (1<<TOIE0) | (1<<TOIE2)  ; interrupt on overflow
 
 	;--- ADC setup ---
  	outi admux, (1<<MUX2) | (1<<MUX1) | (1<<REFS0)
@@ -191,10 +196,7 @@ boot_loader_test1:
 	;--- Reset cause signalling ---
 	clr zl		;wait
 	rcall wms
-	rcall wms
-	rcall wms
-	rcall wms
-	rcall wms
+        GRN_on
         
 
 re1:       
@@ -240,7 +242,7 @@ re3:
 	rcall sound
 	rjmp re5
 re4:    
-	sbrc resetflags, 3	;normal reset (not watchdog)
+	sbrs resetflags, 3	;watchdog reset
 	rjmp re5
        
 	ldx 500
@@ -248,10 +250,14 @@ re4:
 	rcall sound
 
 re5:	
+	sei
 	;--- arming ---
         RED_on
+        GRN_off
         outi WDTCR, (1<<WDCE)+(1<<WDE)           
-        outi WDTCR, (1<<WDE)+(1<<WDP2)+(1<<WDP0)
+        outi WDTCR, (1<<WDE)+(1<<WDP2)+(1<<WDP1)+(1<<WDP0)
+
+        rjmp ar4                ; skip arming
 
 ar2:	ldi Counter, 0
 
@@ -272,7 +278,7 @@ ar1:	rcall GetPwm
 	rcall sound
 
 	inc Counter		;increase counter
-	cpi Counter, 30		;30 in a row?
+	cpi Counter, 10		;10 in a row?
 	brne ar1		;no, arming not OK
 
 	;--- Armed sound ---
@@ -285,11 +291,11 @@ ar3:	ldx 20
 	dec Counter
 	brne ar3
 
+ar4:    
 	clr zl
 	rcall wms
-
+       
 	;--- Main loop ---
-	sei
 ma1:	rcall GetPwm		;get input PWM value
 	
 	subi xl, low(ThrottleNeutral)	;subtract throttle neutral
@@ -311,6 +317,7 @@ ma1:	rcall GetPwm		;get input PWM value
         brge in_range
         rjmp boot_loader_jump
 in_range:       
+        b_bottom_on ;;  turn bottom b on, allowing channel to be used for clutch
         
 	ldy 127			;limit upper value
 	cp  xl, yl
@@ -369,6 +376,7 @@ ma6:    ; update throttle
 	
 GetPwm: ;--- get PWM input value ---
         wdr
+        rcall strobe_swd 
 	;wait for low to high transition on ppm input
 
 ge1:	sbic	PINB, rcp_in		; Skip clear if ICP pin h
@@ -420,7 +428,6 @@ ge3:    sbic	PINB, rcp_in		; Skip clear if ICP pin h
 	;--- ISR ---
 
 timer0overflow:
-
 	in sregsave, sreg
 	ldi tisp, 0x80		;reload ISR counter
 	out tcnt0, tisp
@@ -444,7 +451,7 @@ timer0overflow:
 
 .if BrakeStrength > 0   
 	a_bottom_on		;Brake.
-	b_bottom_on
+	c_bottom_on
 .endif	
 	ldi PwmOut, BrakeStrength
 	rjmp tm2
@@ -463,7 +470,7 @@ tm4:
 	nop		;delay to let top FET turn on before the bottom FET (NFET are better at switching under load)
 	nop
 	nop
-	b_bottom_on
+	c_bottom_on
 	rjmp tm2
 
 
@@ -473,7 +480,7 @@ tm3:
 ;debug_on
 	neg PwmOut
 
-	b_top_on
+	c_top_on
 	nop		;delay to let top FET turn on before the bottom FET
 	nop
 	nop
@@ -487,9 +494,9 @@ tm1:	cp Phase, PwmOut
 	brlo tm2
 
 	a_bottom_off	;bottom off first to let the top switch without current
-	b_bottom_off
+	c_bottom_off
 	a_top_off
-	b_top_off
+	c_top_off
 
 
 	;exit
@@ -498,40 +505,44 @@ tm2:
 	out sreg, sregsave
 	reti
 
-
+timer2overflow:
+        subi softwd, 1
+        breq boot_loader_jump   
+        reti
 
 	;--- Sound generation ---
 
 sound:	cli
 
 	a_bottom_off
-	b_bottom_off
+	c_bottom_off
 	a_top_off
-	b_top_off
+	c_top_off
 
 	ldz 100
 	rcall delay
 
 so1:
         wdr
+        rcall strobe_swd 
 	a_top_on
 	nop
 	nop
 	nop
-	b_bottom_on
+	c_bottom_on
 
 	ldz 200
 	rcall delay
 	
 	a_bottom_off
-	b_bottom_off
+	c_bottom_off
 	a_top_off
-	b_top_off
+	c_top_off
 
 	movw z, y
 	rcall delay
 
-	b_top_on
+	c_top_on
 	nop
 	nop
 	nop
@@ -541,9 +552,9 @@ so1:
 	rcall delay
 	
 	a_bottom_off
-	b_bottom_off
+	c_bottom_off
 	a_top_off
-	b_top_off
+	c_top_off
 
 	movw z, y
 	rcall delay
@@ -554,6 +565,10 @@ so1:
 	sei
 	ret
 
+        ;; implement software watchdog using timer2
+strobe_swd:
+        ldi softwd, 20         ; timeout 400 milliseconds to receive signal
+        ret
 
 	;--- Delay ---
 
@@ -578,13 +593,19 @@ wm2:	  dec zh
 ;-----bko-----------------------------------------------------------------
 boot_loader_jump:
 	cli
+	a_bottom_off
+	b_bottom_off
+	c_bottom_off
+	a_top_off
+	b_top_off
+	c_top_off
+	rcall wms
 
         clr t
 	out	DDRB, t		; Tristate pins
 	out	DDRC, t
 	out	DDRD, t
-	ldz 200
-	rcall delay
+
  	outi	WDTCR, (1<<WDCE)+(1<<WDE), temp1
  	out	WDTCR, ZH		; Disable watchdog
 	rjmp	BOOT_START		; Jump to boot loader

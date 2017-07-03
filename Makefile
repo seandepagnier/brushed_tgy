@@ -2,7 +2,7 @@ ASM?= avra
 
 .SUFFIXES: .inc .hex
 
-ALL_TARGETS = afro_nfet.hex
+ALL_TARGETS = afro_nfet.hex bs_nfet.hex
 
 all: $(ALL_TARGETS)
 
@@ -22,8 +22,12 @@ clean:
 #brushed_tgy.hex: brushed_tgy.asm
 #	avra -fI -o brushed_tgy.hex -e brushed_tgy.eeprom -d brushed_tgy.obj brushed_tgy.asm
 
-upload: afro_nfet.hex
+upload_afro: afro_nfet.hex
 	avrdude -c stk500v2 -b 19200 -P /dev/ttyUSB* -v -u -p m8 -U flash:w:afro_nfet.hex:i
+
+upload_bs: bs_nfet.hex
+	avrdude -c stk500v2 -b 19200 -P /dev/ttyUSB* -v -u -p m8 -U flash:w:bs_nfet.hex:i
+
 
 download:
 	avrdude -c stk500v2 -b 19200 -P /dev/ttyUSB* -v -u -p m8 -U flash:r:test.hex:i
