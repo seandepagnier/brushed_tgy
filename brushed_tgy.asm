@@ -23,8 +23,8 @@
 ;**** SETTINGS ****
 
 .equ	BrakeStrength = 0	;0 to 127
-.equ   MaxSlewRate = 20        ;1 to 127
-.equ	DeadBand = 16		;n/127 parts
+.equ   MaxSlewRate = 16        ;1 to 127
+.equ	DeadBand = 16		;n/127n parts
 .equ	ThrottleNeutral = 1500	;uS
 
 ;******************
@@ -327,7 +327,7 @@ ma3:
 	in yl, adcl		;High temp?
 	in yh, adch
 	
-	ldz 400                 ;  overtemp at 60C
+	ldz 350                 ;  overtemp at 60C
 	cp yl, zl
 	cpc yh, zh
 	brsh ma4
@@ -340,6 +340,10 @@ ma3:
 	ldx 100
 	ldy 2000
 	rcall sound
+
+	rcall wms
+	rcall wms
+        
 	rjmp ma1
 ma4:
         ; Set Throttle
@@ -418,7 +422,7 @@ ge3:    sbic	PINB, rcp_in		; Skip clear if ICP pin h
 timer0overflow:
 
 	in sregsave, sreg
-	ldi tisp, 0xb0		;reload ISR counter
+	ldi tisp, 0x80		;reload ISR counter
 	out tcnt0, tisp
 
 	inc Phase		;PWM generator
