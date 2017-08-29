@@ -221,7 +221,7 @@ re1:
 	ldx 300
 	ldy 1100
 	rcall sound
-        rjmp boot_loader_jump
+        ;rjmp boot_loader_jump
 	rjmp re5
 
 re2:       
