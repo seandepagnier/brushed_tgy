@@ -41,6 +41,7 @@
 .def	resetflags=r22
 .def	Counter=r23
 .def    softwd=r24
+.def    overtempcount=r25
 .equ	BOOT_JUMP	= 1	; Jump to any boot loader when PW
 .equ	BOOT_START	= THIRDBOOTSTART
 
@@ -139,7 +140,9 @@ unused:	reti
 
 reset:	in resetflags, mcucsr
 	outi mcucsr, 0
-
+        ldi overtempcount, 25   ; start out overtemp
+reset2:
+        clr resetflags
         ldi Counter, 0
  	outi	WDTCR, (1<<WDCE)+(1<<WDE)
  	out	WDTCR, Counter		; Disable watchdog
@@ -192,9 +195,8 @@ boot_loader_test1:
 	outi timsk, (1<<TOIE0) | (1<<TOIE2)  ; interrupt on overflow
 
 	;--- ADC setup ---
- 	outi admux, (1<<MUX2) | (1<<MUX1) | (1<<REFS0)
+ 	outi admux, admux_temperature
  	outi adcsra, (1<<ADEN) | (1<<ADSC) | (1<<ADFR) | (1<<ADPS2) | (1<<ADPS1) | (1<<ADPS0)
-
 
 	;--- Variables setup ---
 	clr Throttle
@@ -257,7 +259,7 @@ re4:
 	ldy 1000
 	rcall sound
 	ldx 100
-	ldy 1200
+	ldy 1400
 	rcall sound
 
 re5:	
@@ -326,7 +328,7 @@ ma1:	rcall GetPwm		;get input PWM value
         cp xl, yl
         cpc xh, yh
         brge in_range
-        rjmp reset
+        rjmp reset2
 in_range:       
         b_bottom_on ;;  turn bottom b on, allowing channel to be used for clutch
         
@@ -349,10 +351,15 @@ ma3:
 	cp yl, zl
 	cpc yh, zh
         .if     temperature_pos > 0
-        brlo ma4
+        brlo ma4                
         .else
 	brsh ma4
         .endif
+
+        inc overtempcount
+        cpi overtempcount, 25   ; overtemp for 500ms second or more??
+	brlo ma4a
+        dec overtempcount       ; to avoid overflow
 
 	clr Throttle            ; turn off motor
 
@@ -368,6 +375,8 @@ ma3:
         
 	rjmp ma1
 ma4:
+        clr overtempcount
+ma4a:    
         ; Set Throttle
         mov t, xl
         sub t, Throttle
@@ -525,7 +534,7 @@ timer2overflow:
         reti
 reset_ov:
         
-        rjmp reset
+        rjmp reset2
 
 	;--- Sound generation ---
 

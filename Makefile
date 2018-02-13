@@ -26,7 +26,7 @@ upload_afro: afro_nfet.hex
 	avrdude -c stk500v2 -b 19200 -P /dev/ttyUSB* -v -u -p m8 -U flash:w:afro_nfet.hex:i
 
 upload_bs: bs_nfet.hex
-	avrdude -c stk500v2 -b 19200 -P /dev/ttyUSB* -v -u -p m8 -U flash:w:bs_nfet.hex:i
+	avrdude -c stk500v2 -b 19200 -P /dev/ttyAMA* -v -u -p m8 -U flash:w:bs_nfet.hex:i
 
 
 download:

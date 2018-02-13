@@ -42,6 +42,7 @@
 .equ	mux_temperature	= 6	; ADC6 temperature input (3.3k from +5V, 10k NTC to gnd)
 .equ    temperature_pos = 0 ; adc decreases with temp
 .equ    temperature_hot = 350 ; 1713./(3300+1713)*1024.0 ;  1713 = (65C)
+.equ    admux_temperature = (1<<MUX2) | (1<<MUX1) | (1<<REFS0)
 
 .equ	i2c_clk		= 5	; ADC5/SCL
 .equ	i2c_data	= 4	; ADC4/SDA
