@@ -43,7 +43,7 @@
 .equ	mux_voltage	= 2	; ADC2 voltage input (220k from Vbat, 51k to gnd, 10.10V -> 1.900V at ADC2)
 .equ	mux_temperature	= 1	; ADC1 temperature input (some boards) (10k NTC to gnd, 1.5k to 5v)
 .equ    temperature_pos = 0 ; adc decreases with temp
-.equ    temperature_hot = 545 ; = 1713./(1500+1713)*1023.0 ;  1713 = (65C)
+.equ    temperature_hot = 471 ; = 1280./(1500+1280)*1023.0 ;  1713 = (75C)
 .equ    admux_temperature = (1<<MUX0) | (1<<REFS0)
 .equ	mux_c		= 0	; ADC0
 
