@@ -141,9 +141,9 @@ unused:	reti
 reset:	in resetflags, mcucsr
 	outi mcucsr, 0
         ldi overtempcount, 25   ; start out overtemp
-reset2:
-        clr resetflags
-        ldi Counter, 0
+        rjmp reset3
+reset2: clr resetflags
+reset3: ldi Counter, 0
  	outi	WDTCR, (1<<WDCE)+(1<<WDE)
  	out	WDTCR, Counter		; Disable watchdog
         
@@ -533,7 +533,6 @@ timer2overflow:
         breq reset_ov
         reti
 reset_ov:
-        
         rjmp reset2
 
 	;--- Sound generation ---
