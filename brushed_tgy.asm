@@ -19,6 +19,10 @@
 #include "bs_nfet.inc"	; AfroESC 3 with all nFETs (ICP PWM, I2C, UART)
 #endif
 
+#if defined(tp_nfet_esc)
+#include "tp_nfet.inc"	; AfroESC 3 with all nFETs (ICP PWM, I2C, UART)
+#endif
+        
 ;#if !USE_ICP                    
 ;#error "currently only icp supported"
 ;#endif
@@ -26,7 +30,7 @@
         
 ;**** SETTINGS ****
 
-.equ	BrakeStrength = 0	;0 to 127
+.equ	BrakeStrength = 127	;0 to 127
 .equ    MaxSlewRate = 16        ;1 to 127
 .equ	DeadBand = 16		;n/127n parts
 .equ	ThrottleNeutral = 1500	;uS
@@ -45,24 +49,49 @@
 .equ	BOOT_JUMP	= 1	; Jump to any boot loader when PW
 .equ	BOOT_START	= THIRDBOOTSTART
 
+
+.if inverted_high_side
+.macro	sbix
+	cbi @0, @1
+.endmacro
+.macro	cbix
+	sbi @0, @1
+.endmacro
+.else
+.macro	sbix
+	sbi @0, @1
+.endmacro
+.macro	cbix
+	cbi @0, @1
+.endmacro
+.endif        
+
 .macro	a_top_on
-	cbi ApFET_port, ApFET
+	sbix ApFET_port, ApFET
 .endmacro
 .macro	a_top_off
-	sbi ApFET_port, ApFET
-.endmacro
-.macro	a_bottom_on
-	sbi AnFET_port, AnFET
-.endmacro
-.macro	a_bottom_off
-	cbi AnFET_port, AnFET
+	cbix ApFET_port, ApFET
 .endmacro
 
 .macro	b_top_on
-	cbi BpFET_port, BpFET
+	sbix BpFET_port, BpFET
 .endmacro
 .macro	b_top_off
-	sbi BpFET_port ,BpFET
+	cbix BpFET_port ,BpFET
+.endmacro
+
+.macro	c_top_on
+	sbix CpFET_port, CpFET
+.endmacro
+.macro	c_top_off
+	cbix CpFET_port, CpFET
+.endmacro
+
+.macro	a_bottom_on
+        sbi AnFET_port, AnFET
+.endmacro
+.macro	a_bottom_off
+	cbi AnFET_port, AnFET
 .endmacro
 .macro	b_bottom_on
 	sbi BnFET_port, BnFET
@@ -70,19 +99,14 @@
 .macro	b_bottom_off
 	cbi BnFET_port, BnFET
 .endmacro
-
-.macro	c_top_on
-	cbi CpFET_port, CpFET
-.endmacro
-.macro	c_top_off
-	sbi CpFET_port, CpFET
-.endmacro
 .macro	c_bottom_on
 	sbi CnFET_port, CnFET
 .endmacro
 .macro	c_bottom_off
 	cbi CnFET_port, CnFET
 .endmacro
+
+
 
 .if !defined(red_led)
 	.macro RED_on
@@ -143,9 +167,13 @@ reset:	in resetflags, mcucsr
         ldi overtempcount, 25   ; start out overtemp
         rjmp reset3
 reset2: clr resetflags
-reset3: ldi Counter, 0
- 	outi	WDTCR, (1<<WDCE)+(1<<WDE)
+reset3:
+        ldi Counter, 0
+ 	outi	WDTCR, (1<<WDCE)+(1<<WDE) 
  	out	WDTCR, Counter		; Disable watchdog
+
+;        outi   GICR, (1<<IVCE)  
+;        outi   GICR, 0
         
 	outi spl, low(ramend)
 	outi sph, high(ramend)
@@ -159,7 +187,15 @@ reset3: ldi Counter, 0
 	outi DDRC, DIR_PC
 	outi DDRD, DIR_PD
 
+        a_bottom_off
+        b_bottom_off
+        c_bottom_off
+        a_top_off
+        b_top_off
+        c_top_off
+
         rcall strobe_swd 
+#if 1
         ;;  --- bootloader test ---
         ;; half a second to enter bootloader if pwm pin is held high
         clr t
@@ -171,13 +207,7 @@ boot_loader_test1:
 	rcall delay
 	sbic	RCP_IN_port, rcp_in		; Skip clear if ICP pin h
         rjmp boot_loader_test1
-
-        a_bottom_off
-        b_bottom_off
-        c_bottom_off
-        a_top_off
-        b_top_off
-        c_top_off
+#endif
 
         RED_off
         GRN_off
@@ -187,25 +217,23 @@ boot_loader_test1:
 
 	;--- ISR setup ---
 	outi tccr0, (1<<CS00)   ; no prescale
-	;outi timsk, (1<<TOIE0)  ; interrupt on overflow
 
         rcall strobe_swd 
-        
         outi tccr2, (1<<CS20) | (1<<CS21) | (1<<CS22) ; overflows 61 times per second
 	outi timsk, (1<<TOIE0) | (1<<TOIE2)  ; interrupt on overflow
 
-	;--- ADC setup ---
+	                        ;--- ADC setup ---
+#if admux_temperature
  	outi admux, admux_temperature
  	outi adcsra, (1<<ADEN) | (1<<ADSC) | (1<<ADFR) | (1<<ADPS2) | (1<<ADPS1) | (1<<ADPS0)
-
+#endif
 	;--- Variables setup ---
 	clr Throttle
 
 	;--- Reset cause signalling ---
         sei
 	rcall wms
-        GRN_on
-        
+
 re1:       
 	sbrs resetflags, 2	;Brown out reset
 	rjmp re2
@@ -252,6 +280,7 @@ re4:
 	sbrs resetflags, 3	;watchdog reset
 	rjmp re5
        
+.if F_CPU != 8000000            ; timer2 broken on this?, dont do alarm
 	ldx 100
 	ldy 1200
 	rcall sound
@@ -261,12 +290,11 @@ re4:
 	ldx 100
 	ldy 1400
 	rcall sound
-
-re5:	
+.endif
+re5:        
 	;--- arming ---
         RED_on
         GRN_off
-
 
         outi WDTCR, (1<<WDCE)+(1<<WDE)
         outi WDTCR, (1<<WDE)+(1<<WDP2)+(1<<WDP0) ;
@@ -308,9 +336,9 @@ ar3:	ldx 20
 	rcall wms
 ar4:
 	;--- Main loop ---
-ma1:	rcall GetPwm		;get input PWM value
+ma1:
+	rcall GetPwm		;get input PWM value
 
-	
 	subi xl, low(ThrottleNeutral)	;subtract throttle neutral
 	sbci xh, high(ThrottleNeutral)
 
@@ -330,7 +358,7 @@ ma1:	rcall GetPwm		;get input PWM value
         brge in_range
         rjmp reset2
 in_range:       
-        b_bottom_on ;;  turn bottom b on, allowing channel to be used for clutch
+        ;b_bottom_on ;;  turn bottom b on, allowing channel to be used for clutch
         
 	ldy 127			;limit upper value
 	cp  xl, yl
@@ -344,6 +372,7 @@ ma2:
 	brge ma3
 	ldx -127
 ma3:
+#if admux_temperature
 	in yl, adcl		;High temp?
 	in yh, adch
 	
@@ -377,10 +406,12 @@ ma3:
 ma4:
         clr overtempcount
 ma4a:    
+#endif
         ; Set Throttle
         mov t, xl
         sub t, Throttle
-        breq ma1                ; already set
+        
+        breq ma1               ; already set
         brlt ma5
         ; command greater than throttle
         cpi t, MaxSlewRate
@@ -392,6 +423,7 @@ ma5:    ; command is less than throttle
         brsh ma6
         ldi t, -MaxSlewRate        ; exceeded slew rate
 ma6:    ; update throttle
+        GRN_on
         add Throttle, t
 	rjmp ma1
 
@@ -399,11 +431,12 @@ ma6:    ; update throttle
 	;--- SUBS ---
 	
 GetPwm: ;--- get PWM input value ---
-        rcall strobe_swd 
+        rcall strobe_swd
 	;wait for low to high transition on ppm input
-
+        
 ge1:	sbic	RCP_IN_port, rcp_in		; Skip clear if ICP pin h
 	rjmp ge1
+        cbi RCP_IN_port, rcp_in
 ge2:	sbis	RCP_IN_port, rcp_in		; Skip clear if ICP pin h
 	rjmp ge2
 
@@ -422,12 +455,13 @@ ge3:    sbic	RCP_IN_port, rcp_in		; Skip clear if ICP pin h
 
 	in xl, tcnt1l
 	in xh, tcnt1h
-        asr xh
+.if F_CPU == 16000000           ; divide by 2
+        asr xh                  
         ror xl
+.endif
 
 ;;;  temperature compensation disabled, comment line below to enable
         ret                     ; skip temp comp
-       
 
 	in yl, adcl		;temperature compensation
 	in yh, adch
@@ -593,7 +627,11 @@ so1:
         ;; implement software watchdog using timer2
 strobe_swd:
         wdr
-        ldi softwd, 20         ; timeout 200 milliseconds to receive signal
+.if F_CPU == 8000000         ; timeout 200 milliseconds to receive signal
+        ldi softwd, 10
+.else
+        ldi softwd, 20
+.endif
         ret
 
 	;--- Delay ---
@@ -602,7 +640,11 @@ delay:	sbiw z, 1
 	brne delay
 	ret
 
+.if F_CPU == 8000000         ; timeout 200 milliseconds to receive signal
+wms:	 ldi t,117	; wait zl ms
+.else
 wms:	 ldi t,235	; wait zl ms
+.endif
 wm1:	  ldi zh,11	;34
 wm2:	  dec zh
 	  brne wm2
@@ -628,7 +670,9 @@ boot_loader_jump:
         wdr
  	outi	WDTCR, (1<<WDCE)+(1<<WDE)
  	out	WDTCR, Counter		; Disable watchdog
-        
+.if F_CPU == 8000000         ; timeout 200 milliseconds to receive signal
+        outi OSCCAL, 0xff       
+.endif        
 	a_bottom_off
 	b_bottom_off
 	c_bottom_off

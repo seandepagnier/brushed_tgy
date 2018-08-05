@@ -1,4 +1,4 @@
-This is brushed version of simonk motor controller for atmega8.
+lThis is brushed version of simonk motor controller for atmega8.
 
 tested with afro nfet, and bs nfet esc
 
@@ -6,7 +6,7 @@ For blue series, bootloader is not loaded,
 Solder to 6 pins on blueseries ESC, and connect to arduino
 connect pins D10, D11, D12, D13, 5v, GND to breakout pads on bs esc
 load arduino isp sketch to arduino
-test programmer:
+test programmer: (sometimes takes multiple tries)
   avrdude -c avrisp -b 19200 -P /dev/ttyUSB1 -u -p m8 -U flash:r:flash.hex:i -U eeprom:r:eeprom.hex:i
 load brushless controller:
   avrdude -c avrisp -b 19200 -P /dev/ttyUSB1 -u -p m8 -U flash:w:bs_nfet.hex:i

@@ -89,3 +89,5 @@
 .equ	BnFET_port	= PORTD
 .equ	CnFET_port	= PORTD
 .equ	ApFET_port	= PORTD
+
+.equ inverted_high_side = 1

@@ -73,3 +73,5 @@
 .equ	DIR_PB		= (1<<CnFET)
 
 .equ	CnFET_port	= PORTB
+
+.equ inverted_high_side = 1
