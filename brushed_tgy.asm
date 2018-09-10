@@ -328,7 +328,7 @@ ar1:	rcall GetPwm
 	ldy 2000
 ar3:	ldx 20
 	rcall sound
-	sbiw y, 63
+	sbiw YH:YL, 63
 	dec Counter
 	brne ar3
 
@@ -598,7 +598,7 @@ so1:
 	a_top_off
 	c_top_off
 
-	movw z, y
+	movw ZH:ZL, YH:YL
 	rcall delay
 
 	c_top_on
@@ -615,10 +615,10 @@ so1:
 	a_top_off
 	c_top_off
 
-	movw z, y
+	movw ZH:ZL, YH:YL
 	rcall delay
 
-	sbiw x,1
+	sbiw XH:XL,1
 	brne so1
 	
 	sei
@@ -636,7 +636,7 @@ strobe_swd:
 
 	;--- Delay ---
 
-delay:	sbiw z, 1
+delay:	sbiw ZH:ZL, 1
 	brne delay
 	ret
 
