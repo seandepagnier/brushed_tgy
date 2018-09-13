@@ -2,6 +2,11 @@ lThis is brushed version of simonk motor controller for atmega8.
 
 tested with afro nfet, and bs nfet esc
 
+The following variables from the ESC configuration tp_net.inc files are not used and can be disregarded 
+when adapting the configuration to a new ESC model:
+USE_INT0, USE_I2C, USE_UART, USE_ICP, mux_a, mux_b, mux_c, c_comp, mux_voltage, O_POWER, O_GROUND, 
+
+
 For blue series, bootloader is not loaded,
 Solder to 6 pins on blueseries ESC, and connect to arduino
 connect pins D10, D11, D12, D13, 5v, GND to breakout pads on bs esc
