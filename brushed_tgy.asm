@@ -30,9 +30,9 @@
         
 ;**** SETTINGS ****
 
-.equ	BrakeStrength = 127	;0 to 127
+.equ	BrakeStrength = 0	;0 to 127
 .equ    MaxSlewRate = 16        ;1 to 127
-.equ	DeadBand = 16		;n/127n parts
+.equ	DeadBand = 24		;n/127n parts
 .equ	ThrottleNeutral = 1500	;uS
 
 ;******************
@@ -194,7 +194,12 @@ reset3:
         b_top_off
         c_top_off
 
-        rcall strobe_swd 
+        rcall strobe_swd
+
+.if F_CPU == 8000000         ; timeout 200 milliseconds to receive signal
+        outi OSCCAL, 190     
+.endif        
+        
 #if 1
         ;;  --- bootloader test ---
         ;; half a second to enter bootloader if pwm pin is held high
